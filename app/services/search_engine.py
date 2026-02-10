@@ -182,8 +182,8 @@ class HybridSearchEngine:
         if len(query) > 200:
             raise ValueError("Query too long (max 200 characters)")
         
-        if top_k < 1 or top_k > 100:
-            raise ValueError("top_k must be between 1 and 100")
+        if top_k < 1 or top_k > 500:
+            raise ValueError("top_k must be between 1 and 500")
         
         if self.embeddings is None:
             raise RuntimeError(

@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # Search Settings
     max_query_length: int = Field(default=200, description="Maximum query length in characters")
     default_top_k: int = Field(default=10, description="Default number of results to return")
-    max_top_k: int = Field(default=100, description="Maximum number of results allowed")
+    max_top_k: int = Field(default=500, description="Maximum number of results allowed")
     
     # Scoring Weights
     keyword_weight: float = Field(default=0.4, description="Weight for keyword scoring")
