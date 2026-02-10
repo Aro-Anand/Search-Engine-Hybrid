@@ -313,27 +313,3 @@ git push origin feature/amazing-feature
 
 # Create Pull Request
 ```
-
-## 📝 License
-
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
-
-## 👨‍💻 Authors
-
-- **Your Name** - *Initial work* - [GitHub](https://github.com/yourusername)
-
-## 🙏 Acknowledgments
-
-- [sentence-transformers](https://www.sbert.net/) for semantic embeddings
-- [FastAPI](https://fastapi.tiangolo.com/) for the web framework
-- Community contributors
-
-## 📞 Support
-
-- **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/semantic-search-engine/issues)
-- **Email**: your.email@example.com
-
----
-
-**⭐ Star this repo if you find it useful!**
