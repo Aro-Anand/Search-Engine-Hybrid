@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     Example .env file:
         ENVIRONMENT=production
         API_HOST=0.0.0.0
-        API_PORT=8000
+        API_PORT=9999
         MODEL_NAME=all-MiniLM-L6-v2
     """
     

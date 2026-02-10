@@ -10,12 +10,12 @@
 
 - ⚡ **Smart Franchise Search** - Find franchises by concept, industry, or budget
 - 🧠 **Semantic Understanding** - Matches "cheap food business" to "low-cost restaurant franchise"
-- 📍 **Location & Budget Filters** - Drill down by city, state, or investment range
-- 🔍 **Predictive Autocomplete** - Suggests popular franchises and categories as you type
-- 📊 **Similar Recommendations** - "If you like Pizza Hut, check out Domino's"
+- 📍 **Location & Budget Filters** - Drill down by city, state, or investment range (in Lakhs)
+- 🧠 **Predictive Autocomplete** - Smart "search-as-you-type" that suggests relevant brand titles
+- 📊 **Similar Recommendations** - "If you like Pizza Hut, check out Domino's" (via AI similarity)
 - 🚀 **Production-Ready** - Sub-100ms latency for catalog of 3,000+ franchises
 - 📱 **RESTful API** - Easy integration for franchise marketplaces
-- 🎯 **Optimized for Growth** - Scales efficiently from 100 to 100K listings
+- 🎯 **Optimized for Growth** - Scales efficiently using lightweight CPU-only embeddings
 
 ## 🏗️ Architecture
 
@@ -78,27 +78,27 @@ pip install -r requirements.txt
 # Start API server
 python -m app.main
 
-# Server runs at http://localhost:8000
-# API docs at http://localhost:8000/docs
+# Server runs at http://localhost:9999
+# API docs at http://localhost:9999/docs
 ```
 
 ### Usage Examples
 
 ```bash
-# Search for listings
-curl "http://localhost:8000/api/v1/search?q=laptop&limit=5"
+# Search for franchises
+curl "http://localhost:9999/api/v1/search?q=pizza&limit=5"
 
-# Get autocomplete suggestions
-curl "http://localhost:8000/api/v1/autocomplete?q=lap&limit=5"
+# Get smart title suggestions
+curl "http://localhost:9999/api/v1/autocomplete?q=piz&limit=5"
 
-# Add recent search
-curl -X POST "http://localhost:8000/api/v1/recent?user_id=user123&query=gaming laptop"
+# Get available filters
+curl "http://localhost:9999/api/v1/filters"
 
-# Get recent searches
-curl "http://localhost:8000/api/v1/recent/user123"
+# Get similar recommendations
+curl "http://localhost:9999/api/v1/recommend/franchise_123"
 
 # Health check
-curl "http://localhost:8000/health"
+curl "http://localhost:9999/health"
 ```
 
 ## 📊 API Documentation
@@ -179,8 +179,8 @@ GET /api/v1/autocomplete?q={partial}&limit={limit}
 **Response:**
 ```json
 {
-  "query": "lap",
-  "suggestions": ["laptop", "laptop bag", "laptop stand"]
+  "query": "piz",
+  "suggestions": ["Pizza Hut", "Domino's Pizza", "La Pino'z Pizza"]
 }
 ```
 
@@ -231,7 +231,7 @@ POST /api/v1/admin/retrain
 }
 ```
 
-[Full API documentation](docs/API.md) | [Interactive Docs](http://localhost:8000/docs)
+[Full API documentation](docs/API.md) | [Interactive Docs](http://localhost:9999/docs)
 
 ## 🧪 Testing
 
@@ -308,10 +308,10 @@ sudo systemctl restart nginx
 
 ```bash
 # Build image
-docker build -t semantic-search .
+docker build -t franchise-discovery .
 
 # Run container
-docker run -p 8000:8000 -v $(pwd)/data:/app/data semantic-search
+docker run -dp 9999:9999 --name franchise-api franchise-discovery
 ```
 
 ## ⚙️ Configuration
@@ -321,7 +321,7 @@ Create a `.env` file:
 ```env
 # API Settings
 API_HOST=0.0.0.0
-API_PORT=8000
+API_PORT=9999
 API_WORKERS=2
 
 # Model Settings
