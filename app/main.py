@@ -4,20 +4,22 @@ Semantic Search API - Main Application
 FastAPI application providing REST endpoints for hybrid semantic search.
 
 Author: Development Team
-Version: 1.0.0
+Version: 2.0.0
 """
 
 import logging
 import time
 import json
 from pathlib import Path
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.core.search_engine import HybridSearchEngine
-from app.core.autocomplete import AutocompleteEngine
+from app.services.search_engine import HybridSearchEngine
+from app.services.autocomplete import AutocompleteEngine
+from app.api.v1.endpoints import search, listings, admin
 
 # Configure logging
 logging.basicConfig(
@@ -26,29 +28,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
-app = FastAPI(
-    title="Semantic Search API",
-    description="Hybrid keyword + semantic search engine for small-scale datasets",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure based on your needs
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize search engine on startup."""
-    logger.info("Starting Semantic Search API...")
+# Lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize and cleanup application resources."""
+    # Startup logic
+    logger.info("Starting Franchise Discovery API...")
     
     app.state.start_time = time.time()
     
@@ -60,59 +46,24 @@ async def startup_event():
     data_path = Path("data/listings.json")
     
     if not data_path.exists():
-        logger.warning(f"Data file not found: {data_path}")
-        logger.warning("Creating sample data...")
-        
-        # Create sample data
-        sample_listings = [
-            {
-                "id": "1",
-                "title": "Gaming Laptop - High Performance",
-                "description": "Powerful laptop for gaming and creative work",
-                "category": "Electronics",
-                "price": 1299.99,
-                "tags": ["laptop", "gaming", "computer"]
-            },
-            {
-                "id": "2",
-                "title": "Wireless Mouse - Ergonomic",
-                "description": "Comfortable wireless mouse for everyday use",
-                "category": "Electronics",
-                "price": 29.99,
-                "tags": ["mouse", "wireless", "accessory"]
-            },
-            {
-                "id": "3",
-                "title": "Mechanical Keyboard - RGB",
-                "description": "Premium mechanical keyboard with RGB lighting",
-                "category": "Electronics",
-                "price": 149.99,
-                "tags": ["keyboard", "mechanical", "gaming"]
-            }
-        ]
-        
-        # Ensure data directory exists
-        data_path.parent.mkdir(exist_ok=True)
-        
-        # Save sample data
-        with open(data_path, 'w') as f:
-            json.dump(sample_listings, f, indent=2)
-        
-        listings = sample_listings
+        logger.error(f"Data file not found: {data_path}")
+        listings_data = []
     else:
         # Load existing data
-        with open(data_path) as f:
-            listings = json.load(f)
+        with open(data_path, encoding='utf-8') as f:
+            listings_data = json.load(f)
     
-    logger.info(f"Loaded {len(listings)} listings")
+    logger.info(f"Loaded {len(listings_data)} listings")
     
     # Index listings
-    engine.index_listings(listings)
+    if listings_data:
+        engine.index_listings(listings_data)
     
     # Initialize autocomplete
     logger.info("Building autocomplete index...")
     autocomplete = AutocompleteEngine()
-    autocomplete.build_from_listings(listings)
+    if listings_data:
+        autocomplete.build_from_listings(listings_data)
     
     # Store in app state
     app.state.search_engine = engine
@@ -120,25 +71,53 @@ async def startup_event():
     app.state.recent_searches = {}  # user_id -> list of recent queries
     
     logger.info("Startup complete!")
+    
+    yield
+    
+    # Shutdown logic
+    logger.info("Shutting down Franchise Discovery API...")
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down Semantic Search API...")
+# Create FastAPI app
+app = FastAPI(
+    title="Franchise Discovery API",
+    description="Intelligent franchise search engine with hybrid keyword + semantic discovery",
+    version="2.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure based on your needs
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Include routers
+app.include_router(search.router, prefix="/api/v1", tags=["search"])
+app.include_router(listings.router, prefix="/api/v1", tags=["listings"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
     return {
-        "name": "Semantic Search API",
-        "version": "1.0.0",
+        "name": "Franchise Discovery API",
+        "version": "2.1.0",
         "status": "running",
         "endpoints": {
             "search": "/api/v1/search",
+            "filters": "/api/v1/filters",
+            "recommend": "/api/v1/recommend/{franchise_id}",
             "autocomplete": "/api/v1/autocomplete",
-            "recent": "/api/v1/recent",
+            "add_listing": "/api/v1/listings",
+            "retrain": "/api/v1/admin/retrain",
             "health": "/health",
             "docs": "/docs"
         }
@@ -161,93 +140,13 @@ async def health_check():
         "indexed_listings": stats['indexed_listings'],
         "total_searches": stats['total_searches'],
         "model_loaded": True,
-        "version": "1.0.0"
+        "version": "2.1.0"
     }
 
 
-@app.get("/api/v1/search")
-async def search(
-    q: str = Query(..., min_length=1, max_length=200, description="Search query"),
-    limit: int = Query(10, ge=1, le=100, description="Max results"),
-    offset: int = Query(0, ge=0, description="Pagination offset")
-):
-    """
-    Search listings with hybrid keyword + semantic matching.
-    
-    **Parameters:**
-    - **q**: Search query string (required)
-    - **limit**: Maximum results to return (1-100, default: 10)
-    - **offset**: Pagination offset (default: 0)
-    
-    **Returns:**
-    - **query**: The search query
-    - **total_results**: Total matching results
-    - **results**: List of matching listings with scores
-    - **processing_time_ms**: Search latency in milliseconds
-    """
-    start_time = time.time()
-    
-    try:
-        # Execute search
-        results = app.state.search_engine.search(q, top_k=limit + offset)
-        
-        # Apply pagination
-        paginated_results = results[offset:offset + limit]
-        
-        processing_time = (time.time() - start_time) * 1000
-        
-        logger.info(
-            f"Search: query='{q}', results={len(paginated_results)}, "
-            f"time={processing_time:.2f}ms"
-        )
-        
-        return {
-            "query": q,
-            "total_results": len(results),
-            "results": paginated_results,
-            "processing_time_ms": round(processing_time, 2)
-        }
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Search error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Search failed")
-
-
-@app.get("/api/v1/autocomplete")
-async def autocomplete(
-    q: str = Query(..., min_length=1, max_length=50, description="Partial query"),
-    limit: int = Query(5, ge=1, le=10, description="Max suggestions")
-):
-    """
-    Get autocomplete suggestions for partial query.
-    
-    **Parameters:**
-    - **q**: Partial query string (required)
-    - **limit**: Maximum suggestions (1-10, default: 5)
-    
-    **Returns:**
-    - **suggestions**: List of suggested terms
-    """
-    try:
-        suggestions = app.state.autocomplete.suggest(q, limit=limit)
-        
-        return {
-            "query": q,
-            "suggestions": suggestions
-        }
-        
-    except Exception as e:
-        logger.error(f"Autocomplete error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Autocomplete failed")
-
-
+# Keep legacy endpoints for backward compatibility
 @app.post("/api/v1/recent")
-async def add_recent_search(
-    user_id: str = Query(..., min_length=1),
-    query: str = Query(..., min_length=1)
-):
+async def add_recent_search(user_id: str, query: str):
     """
     Add a search query to user's recent searches.
     
@@ -279,7 +178,10 @@ async def add_recent_search(
         
     except Exception as e:
         logger.error(f"Add recent search error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to record search")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to record search"}
+        )
 
 
 @app.get("/api/v1/recent/{user_id}")
@@ -338,7 +240,7 @@ async def get_stats():
 
 # Error handlers
 @app.exception_handler(404)
-async def not_found_handler(request: Request, exc: HTTPException):
+async def not_found_handler(request: Request, exc):
     """Custom 404 handler."""
     return JSONResponse(
         status_code=404,
@@ -356,7 +258,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=9999,
         reload=True,
         log_level="info"
     )

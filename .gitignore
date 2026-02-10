@@ -26,16 +26,18 @@ ENV/
 htmlcov/
 *.cover
 .hypothesis/
-
+tests/
+index.html
 # Data files
 data/*.npy
 data/*.pkl
 *.log
-
+Search-engine-api.ppk
 # OS
 .DS_Store
 Thumbs.db
-
+Docs/
+Search-engineapi.ppk
 # Distribution / packaging
 dist/
 build/

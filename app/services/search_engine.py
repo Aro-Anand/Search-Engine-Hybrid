@@ -109,13 +109,15 @@ class HybridSearchEngine:
         self.listings = listings
         
         # Create searchable text for each listing
-        # Combines title, description, category for better matching
+        # Combines title, description, sector, location, investment, and tags
         texts = []
         for listing in listings:
             searchable_text = " ".join([
                 listing.get('title', ''),
                 listing.get('description', ''),
-                listing.get('sector', ''),  # Changed from category to sector
+                listing.get('sector', ''),
+                listing.get('location', ''),
+                listing.get('investment_range', ''),
                 " ".join(listing.get('tags', []))
             ]).strip()
             texts.append(searchable_text)
@@ -274,7 +276,9 @@ class HybridSearchEngine:
             text = " ".join([
                 listing.get('title', ''),
                 listing.get('description', ''),
-                listing.get('sector', ''),  # Changed from category to sector
+                listing.get('sector', ''),
+                listing.get('location', ''),
+                listing.get('investment_range', ''),
                 " ".join(listing.get('tags', []))
             ]).lower()
             
@@ -306,6 +310,91 @@ class HybridSearchEngine:
         results.sort(key=lambda x: x['keyword_score'], reverse=True)
         
         return results
+    
+    def add_listing(self, listing: Dict[str, Any]) -> None:
+        """
+        Add a single listing to the index.
+        
+        This method adds a new listing and updates the embeddings incrementally.
+        
+        Args:
+            listing: Listing dictionary with at least 'id' and 'title'
+        
+        Raises:
+            ValueError: If listing is missing required fields
+        """
+        # Validate required fields
+        required_fields = {'id', 'title'}
+        missing = required_fields - set(listing.keys())
+        if missing:
+            raise ValueError(f"Listing missing required fields: {missing}")
+        
+        logger.info(f"Adding new listing: {listing.get('id')}")
+        
+        # Add to listings
+        self.listings.append(listing)
+        
+        # Create searchable text
+        searchable_text = " ".join([
+            listing.get('title', ''),
+            listing.get('description', ''),
+            listing.get('sector', ''),
+            listing.get('location', ''),
+            listing.get('investment_range', ''),
+            " ".join(listing.get('tags', []))
+        ]).strip()
+        
+        # Generate embedding for new listing
+        new_embedding = self.model.encode(
+            [searchable_text],
+            show_progress_bar=False,
+            normalize_embeddings=True
+        )
+        
+        # Append to embeddings
+        if self.embeddings is None:
+            self.embeddings = new_embedding
+        else:
+            self.embeddings = np.vstack([self.embeddings, new_embedding])
+        
+        logger.info(f"Listing added. Total listings: {len(self.listings)}")
+    
+    def reload_from_file(self, file_path: str) -> int:
+        """
+        Reload all listings from a JSON file and re-index.
+        
+        Args:
+            file_path: Path to the JSON file containing listings
+        
+        Returns:
+            Number of listings loaded
+        
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            ValueError: If JSON is invalid
+        """
+        import json
+        from pathlib import Path
+        
+        logger.info(f"Reloading listings from: {file_path}")
+        
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Data file not found: {file_path}")
+        
+        # Load listings from file
+        with open(path, encoding='utf-8') as f:
+            listings = json.load(f)
+        
+        if not listings:
+            logger.warning("No listings found in file")
+            return 0
+        
+        # Re-index all listings
+        self.index_listings(listings)
+        
+        logger.info(f"Reloaded {len(listings)} listings")
+        return len(listings)
     
     def get_stats(self) -> Dict[str, Any]:
         """

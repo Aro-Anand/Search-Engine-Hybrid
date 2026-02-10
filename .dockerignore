@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+index.html
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+*.md
+!README.md
+Docs/
+
+# Development
+requirements-dev.txt
+.env.example
+.python-version
+
+# Project specific
+tests/
+*.log
+uv.lock
+pyproject.toml
+index.html
+app/main_refactored.py
+Search-engine-api.ppk
+Docs/
+tests/
+index.html
+requirements-dev.txt
+Search-engineapi.ppk

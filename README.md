@@ -1,20 +1,21 @@
-# Semantic Search Engine
+# Intelligent Franchise Discovery API
 
 ![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-**Fast, intelligent search for small-scale datasets using hybrid keyword + semantic matching.**
+**High-performance semantic search engine optimized for franchise discovery.**
 
 ## 🌟 Features
 
-- ⚡ **Sub-100ms Search Latency** - Optimized for real-time user experience
-- 🧠 **Semantic Understanding** - Finds relevant results even with different wording
-- 🔍 **Google-like Autocomplete** - Intelligent suggestions as users type
-- 📊 **Hybrid Ranking** - Combines keyword matching with semantic similarity
-- 🚀 **Production-Ready** - Comprehensive logging, monitoring, and error handling
-- 📱 **RESTful API** - Easy integration with any frontend framework
-- 🎯 **Optimized for 200-10K Listings** - Perfect for small to medium catalogs
+- ⚡ **Smart Franchise Search** - Find franchises by concept, industry, or budget
+- 🧠 **Semantic Understanding** - Matches "cheap food business" to "low-cost restaurant franchise"
+- 📍 **Location & Budget Filters** - Drill down by city, state, or investment range
+- 🔍 **Predictive Autocomplete** - Suggests popular franchises and categories as you type
+- 📊 **Similar Recommendations** - "If you like Pizza Hut, check out Domino's"
+- 🚀 **Production-Ready** - Sub-100ms latency for catalog of 3,000+ franchises
+- 📱 **RESTful API** - Easy integration for franchise marketplaces
+- 🎯 **Optimized for Growth** - Scales efficiently from 100 to 100K listings
 
 ## 🏗️ Architecture
 
@@ -102,34 +103,70 @@ curl "http://localhost:8000/health"
 
 ## 📊 API Documentation
 
-### Search Endpoint
+### Search Endpoint with Filters
 
 ```http
-GET /api/v1/search?q={query}&limit={limit}&offset={offset}
+GET /api/v1/search?q=pizza&sector=Food&location=Mumbai&max_investment=5000000
 ```
 
 **Parameters:**
-- `q` (required): Search query string
-- `limit` (optional): Max results, default 10, max 100
-- `offset` (optional): Pagination offset, default 0
+- `q`: Search query (e.g., "fast food")
+- `sector`: Filter by industry (e.g., "Retail", "Education")
+- `location`: Filter by city/state (e.g., "Delhi", "Maharashtra")
+- `min_investment` / `max_investment`: Budget range (in Lakhs)
 
 **Response:**
 ```json
 {
-  "query": "laptop",
-  "total_results": 42,
+  "query": "pizza",
+  "total_results": 15,
   "results": [
     {
-      "id": "123",
-      "title": "Gaming Laptop",
-      "description": "High-performance laptop...",
-      "score": 0.87,
-      "keyword_score": 0.9,
-      "semantic_score": 0.85,
+      "id": "franchise_123",
+      "title": "Pizza Hut",
+      "sector": "Food & Beverage",
+      "location": "Mumbai, Maharashtra",
+      "investment_range": "₹20L - ₹50L",
+      "score": 0.92,
       "match_type": "hybrid"
     }
-  ],
-  "processing_time_ms": 45
+  ]
+}
+```
+
+### Available Filter Options
+
+```http
+GET /api/v1/filters
+```
+
+**Response:**
+```json
+{
+  "sectors": ["Automotive", "Education", "Food & Beverage", "Retail"],
+  "locations": ["Bangalore", "Delhi", "Mumbai", "Pune"],
+  "investment_ranges": ["₹5L - ₹10L", "₹10L - ₹20L", "₹20L - ₹50L"]
+}
+```
+
+### Similar Recommendations
+
+```http
+GET /api/v1/recommend/franchise_123?limit=5
+```
+
+**Response:**
+```json
+{
+  "franchise_id": "franchise_123",
+  "franchise_title": "Pizza Hut",
+  "recommendations": [
+    {
+      "id": "franchise_456", 
+      "title": "Domino's Pizza",
+      "score": 0.88
+    }
+  ]
 }
 ```
 
@@ -147,25 +184,63 @@ GET /api/v1/autocomplete?q={partial}&limit={limit}
 }
 ```
 
+### Add Franchise Listing
+
+```http
+POST /api/v1/listings
+```
+
+**Request Body:**
+```json
+{
+  "id": "franchise_new_001",
+  "title": "Burger King",
+  "description": "Global burger chain franchise opportunity",
+  "sector": "Food & Beverage",
+  "location": "Pan India",
+  "investment_range": "₹1Cr - ₹2Cr",
+  "tags": ["burger", "fast food", "premium"]
+}
+```
+
+**Response:** (201 Created)
+```json
+{
+  "id": "franchise_new_001",
+  "title": "Burger King",
+  "description": "Global burger chain franchise opportunity",
+  "sector": "Food & Beverage",
+  "location": "Pan India",
+  "investment_range": "₹1Cr - ₹2Cr",
+  "tags": ["burger", "fast food", "premium"]
+}
+```
+
+### Retrain Endpoint
+
+```http
+POST /api/v1/admin/retrain
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Search engine retrained successfully",
+  "listings_count": 150
+}
+```
+
 [Full API documentation](docs/API.md) | [Interactive Docs](http://localhost:8000/docs)
 
 ## 🧪 Testing
 
 ```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
+# Run endpoint tests
+python tests/test_endpoints.py
 
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app --cov-report=html --cov-report=term
-
-# Run specific test file
-pytest tests/test_search_engine.py -v
-
-# Load testing
-locust -f tests/locustfile.py --host http://localhost:8000
+# Or use pytest if you have it installed
+pytest tests/ -v
 ```
 
 ## 📦 Project Structure
@@ -173,31 +248,31 @@ locust -f tests/locustfile.py --host http://localhost:8000
 ```
 semantic-search-engine/
 ├── app/
+│   ├── api/
+│   │   └── v1/
+│   │       └── endpoints/
+│   │           ├── search.py         # Search & autocomplete endpoints
+│   │           ├── listings.py       # Listing management
+│   │           └── admin.py          # Admin operations
 │   ├── core/
-│   │   ├── search_engine.py      # Hybrid search logic
-│   │   ├── autocomplete.py       # Trie-based autocomplete
-│   │   └── __init__.py
-│   ├── main.py                   # FastAPI application
+│   │   ├── config.py                 # Configuration management
+│   │   └── exceptions.py             # Custom exceptions
+│   ├── schemas/
+│   │   └── search.py                 # Pydantic models
+│   ├── services/
+│   │   ├── search_engine.py          # Hybrid search logic
+│   │   └── autocomplete.py           # Trie-based autocomplete
+│   ├── main.py                       # FastAPI application
 │   └── __init__.py
 ├── data/
-│   └── listings.json             # Sample data
+│   └── listings.json                 # Sample data
 ├── tests/
-│   ├── test_search_engine.py
-│   ├── test_autocomplete.py
-│   └── test_api.py
-├── docs/
-│   ├── API.md                    # API documentation
-│   ├── DEPLOYMENT.md             # Deployment guide
-│   └── ARCHITECTURE.md           # System architecture
-├── deployment/
-│   ├── systemd/
-│   │   └── semantic-search.service
-│   └── nginx/
-│       └── semantic-search.conf
-├── requirements.txt              # Production dependencies
-├── requirements-dev.txt          # Development dependencies
-├── README.md                     # This file
-└── LICENSE                       # MIT License
+│   └── test_endpoints.py             # API endpoint tests
+├── Dockerfile                        # Docker container definition
+├── .dockerignore                     # Docker build exclusions
+├── requirements.txt                  # Production dependencies
+├── requirements-dev.txt              # Development dependencies
+└── README.md                         # This file
 ```
 
 ## 🚢 Deployment
