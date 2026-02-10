@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1",
+    "title": "Gaming Laptop - High Performance RTX 4070",
+    "description": "Powerful gaming laptop with NVIDIA RTX 4070 graphics card, Intel i9 processor, 32GB RAM, and 1TB SSD",
+    "category": "Electronics",
+    "price": 1899.99,
+    "tags": ["laptop", "gaming", "computer"]
+  },
+  {
+    "id": "2",
+    "title": "Budget Notebook Computer for Students",
+    "description": "Affordable laptop ideal for students. Intel i5, 8GB RAM, 256GB SSD",
+    "category": "Electronics",
+    "price": 549.99,
+    "tags": ["laptop", "budget", "notebook", "student"]
+  }
+]

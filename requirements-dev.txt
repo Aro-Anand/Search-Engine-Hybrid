@@ -1,0 +1,18 @@
+# Testing
+pytest==7.4.4
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+httpx==0.26.0
+
+# Code quality
+black==24.1.1
+flake8==7.0.0
+mypy==1.8.0
+isort==5.13.2
+
+# Load testing
+locust==2.20.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.3
