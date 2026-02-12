@@ -18,6 +18,7 @@ class ListingCreate(BaseModel):
     location: Optional[str] = Field(None, description="Franchise location or availability")
     investment_range: Optional[str] = Field(None, description="Investment range (e.g., ₹10L-₹20L)")
     tags: Optional[List[str]] = Field(default_factory=list, description="Tags for categorization")
+    slug: Optional[str] = Field(None, description="URL-friendly slug generated from title")
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -44,6 +45,7 @@ class ListingResponse(BaseModel):
     location: Optional[str] = None
     investment_range: Optional[str] = None
     tags: Optional[List[str]] = None
+    slug: Optional[str] = Field(None, description="URL-friendly slug")
     score: Optional[float] = Field(None, description="Relevance score (0.0-1.0)")
     keyword_score: Optional[float] = Field(None, description="Keyword matching score")
     semantic_score: Optional[float] = Field(None, description="Semantic similarity score")

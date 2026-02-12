@@ -124,20 +124,21 @@ async def autocomplete(
     the most relevant franchise titles based on the users partial input.
     """
     try:
-        # Use the search engine to find related franchises
-        # We search for more than limit to ensure we have enough diversity after title extraction
-        results = request.app.state.search_engine.search(q, top_k=limit * 2)
+        # Use the dedicated autocomplete engine for prefix matching
+        suggestions = request.app.state.autocomplete.suggest(q, limit=limit)
         
-        # Extract unique titles and preserve order (relevance)
-        seen = set()
-        suggestions = []
-        for r in results:
-            title = r.get('title')
-            if title and title not in seen:
-                suggestions.append(title)
-                seen.add(title)
-            if len(suggestions) >= limit:
-                break
+        # If Trie returns nothing, fallback to search engine for semantic suggestions
+        if not suggestions:
+            results = request.app.state.search_engine.search(q, top_k=limit)
+            suggestions = []
+            seen = set()
+            for r in results:
+                title = r.get('title')
+                if title and title not in seen:
+                    suggestions.append(title)
+                    seen.add(title)
+                if len(suggestions) >= limit:
+                    break
         
         return AutocompleteResponse(
             query=q,
@@ -223,7 +224,7 @@ async def get_recommendations(
         source_index = None
         
         for idx, listing in enumerate(listings):
-            if str(listing.get('id')) == str(franchise_id):
+            if str(listing.get('id')) == str(franchise_id) or listing.get('slug') == franchise_id:
                 source_franchise = listing
                 source_index = idx
                 break

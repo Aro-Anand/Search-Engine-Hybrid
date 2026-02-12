@@ -19,10 +19,12 @@ ENV/
 *.swp
 *.swo
 *~
-
+data/listings.json.bak
+scripts/migrate_slugs.py
 # Testing
 .pytest_cache/
 .coverage
+body.json
 htmlcov/
 *.cover
 .hypothesis/

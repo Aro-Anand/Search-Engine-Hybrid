@@ -200,59 +200,71 @@ class HybridSearchEngine:
         # Stage 1: Keyword filtering (fast pre-filter)
         keyword_matches = self._keyword_search(query)
         
-        # If very few matches, return them directly
-        if len(keyword_matches) <= top_k:
-            logger.debug(
-                f"Keyword filter returned {len(keyword_matches)} results, "
-                "skipping semantic ranking"
+        # If we have keyword matches, use them for re-ranking
+        if keyword_matches:
+            match_indices = [m['_index'] for m in keyword_matches]
+            match_embeddings = self.embeddings[match_indices]
+            
+            # Generate query embedding
+            query_embedding = self.model.encode(
+                [query],
+                show_progress_bar=False,
+                normalize_embeddings=True
             )
+            
+            # Compute semantic similarities
+            similarities = cosine_similarity(query_embedding, match_embeddings)[0]
+            
+            # Stage 3: Score fusion
+            for i, match in enumerate(keyword_matches):
+                match['semantic_score'] = float(similarities[i])
+                match['score'] = (
+                    keyword_weight * match['keyword_score'] +
+                    semantic_weight * match['semantic_score']
+                )
+                
+                # Determine match type
+                if match['keyword_score'] > 0.5 and match['semantic_score'] > 0.5:
+                    match['match_type'] = 'hybrid'
+                elif match['keyword_score'] > match['semantic_score']:
+                    match['match_type'] = 'keyword'
+                else:
+                    match['match_type'] = 'semantic'
+                
+                # Clean up internal fields
+                del match['_index']
+            
+            # Sort by combined score
+            keyword_matches.sort(key=lambda x: x['score'], reverse=True)
             return keyword_matches[:top_k]
-        
-        # Stage 2: Semantic re-ranking
-        # Only compute embeddings for keyword matches (optimization)
-        match_indices = [m['_index'] for m in keyword_matches]
-        
-        # Generate query embedding
-        query_embedding = self.model.encode(
-            [query],
-            show_progress_bar=False,
-            normalize_embeddings=True
-        )
-        
-        # Get embeddings for matched listings
-        match_embeddings = self.embeddings[match_indices]
-        
-        # Compute semantic similarities
-        similarities = cosine_similarity(query_embedding, match_embeddings)[0]
-        
-        # Stage 3: Score fusion
-        # Combine keyword and semantic scores
-        for i, match in enumerate(keyword_matches):
-            match['semantic_score'] = float(similarities[i])
-            match['score'] = (
-                keyword_weight * match['keyword_score'] +
-                semantic_weight * match['semantic_score']
+            
+        # If NO keyword matches, fall back to FULL semantic search on all listings
+        else:
+            logger.debug("No keyword matches found, performing full semantic search")
+            
+            # Generate query embedding
+            query_embedding = self.model.encode(
+                [query],
+                show_progress_bar=False,
+                normalize_embeddings=True
             )
             
-            # Determine match type
-            if match['keyword_score'] > 0.5 and match['semantic_score'] > 0.5:
-                match['match_type'] = 'hybrid'
-            elif match['keyword_score'] > match['semantic_score']:
-                match['match_type'] = 'keyword'
-            else:
-                match['match_type'] = 'semantic'
+            # Compute similarities with ALL listings
+            similarities = cosine_similarity(query_embedding, self.embeddings)[0]
             
-            # Clean up internal fields
-            del match['_index']
-        
-        # Sort by combined score
-        keyword_matches.sort(key=lambda x: x['score'], reverse=True)
-        
-        results = keyword_matches[:top_k]
-        
-        logger.debug(f"Returning {len(results)} results")
-        
-        return results
+            # Get top indices
+            top_indices = np.argsort(similarities)[::-1][:top_k]
+            
+            results = []
+            for idx in top_indices:
+                listing = self.listings[idx].copy()
+                listing['score'] = float(similarities[idx])
+                listing['keyword_score'] = 0.0
+                listing['semantic_score'] = float(similarities[idx])
+                listing['match_type'] = 'semantic'
+                results.append(listing)
+                
+            return results
     
     def _keyword_search(self, query: str) -> List[Dict[str, Any]]:
         """

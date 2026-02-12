@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, status
 
 from app.schemas.search import ListingCreate, ListingResponse
+from app.core.utils import generate_slug
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,10 @@ async def add_listing(
     try:
         # Convert Pydantic model to dict
         listing_dict = listing.model_dump()
+        
+        # Generate slug if not provided
+        if not listing_dict.get('slug'):
+            listing_dict['slug'] = generate_slug(listing_dict['title'])
         
         # Persist to JSON file - CHECK FOR DUPLICATES FIRST
         data_path = Path("data/listings.json")
