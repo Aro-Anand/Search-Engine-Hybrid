@@ -26,8 +26,17 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 COPY app/ ./app/
 COPY data/ ./data/
 
+# Pre-download the model as root so cache is accessible
+ENV HF_HOME=/app/.cache
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
 # Expose port
 EXPOSE 9999
+
+RUN adduser --disabled-password --no-create-home appuser && \
+    chown -R appuser:appuser /app/.cache
+
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
