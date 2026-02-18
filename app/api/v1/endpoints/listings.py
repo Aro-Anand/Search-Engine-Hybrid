@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, status
 
 from app.schemas.search import ListingCreate, ListingResponse
-from app.core.utils import generate_slug
+# from app.core.utils import generate_slug
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +36,12 @@ async def add_listing(
         # Convert Pydantic model to dict
         listing_dict = listing.model_dump()
         
-        # Generate slug if not provided
+        # Validate slug exists since UI will send it
         if not listing_dict.get('slug'):
-            listing_dict['slug'] = generate_slug(listing_dict['title'])
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Slug is required"
+            )
         
         # Persist to JSON file - CHECK FOR DUPLICATES FIRST
         data_path = Path("data/listings.json")

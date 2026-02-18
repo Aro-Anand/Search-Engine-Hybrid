@@ -11,14 +11,14 @@ from pydantic import BaseModel, Field, ConfigDict
 class ListingCreate(BaseModel):
     """Schema for creating a new franchise listing."""
     
-    id: str = Field(..., description="Unique franchise listing identifier")
+    id: Union[str, int] = Field(..., description="Unique franchise listing identifier")
     title: str = Field(..., min_length=1, max_length=200, description="Franchise name/title")
     description: Optional[str] = Field(None, description="Franchise description and details")
     sector: Optional[str] = Field(None, description="Business sector (e.g., Food & Beverage, Retail, Technology)")
     location: Optional[str] = Field(None, description="Franchise location or availability")
     investment_range: Optional[str] = Field(None, description="Investment range (e.g., ₹10L-₹20L)")
     tags: Optional[List[str]] = Field(default_factory=list, description="Tags for categorization")
-    slug: Optional[str] = Field(None, description="URL-friendly slug generated from title")
+    slug: str = Field(..., description="URL-friendly slug provided by UI")
     
     model_config = ConfigDict(
         json_schema_extra={
