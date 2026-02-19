@@ -2,9 +2,10 @@
 Semantic Search API - Main Application
 
 FastAPI application providing REST endpoints for hybrid semantic search.
+Indexes listings, blogs, and pages for unified multi-sector search.
 
 Author: Development Team
-Version: 2.0.0
+Version: 3.0.0
 """
 
 import logging
@@ -12,6 +13,7 @@ import time
 import json
 from pathlib import Path
 from contextlib import asynccontextmanager
+from typing import List, Dict, Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +21,7 @@ from fastapi.responses import JSONResponse
 
 from app.services.search_engine import HybridSearchEngine
 from app.services.autocomplete import AutocompleteEngine
-from app.api.v1.endpoints import search, listings, admin
+from app.api.v1.endpoints import search, listings, admin, blogs, pages
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +29,33 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def load_json_data(file_path: str, post_type: str) -> List[Dict[str, Any]]:
+    """
+    Load data from a JSON file and tag each record with a post_type.
+    
+    Args:
+        file_path: Path to the JSON file
+        post_type: Content type tag ('listing', 'blog', or 'page')
+    
+    Returns:
+        List of records with post_type field added
+    """
+    path = Path(file_path)
+    if not path.exists():
+        logger.warning(f"Data file not found: {file_path}")
+        return []
+    
+    with open(path, encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Tag each record with its content type
+    for record in data:
+        record['post_type'] = post_type
+    
+    logger.info(f"Loaded {len(data)} {post_type}s from {file_path}")
+    return data
 
 
 # Lifespan context manager
@@ -42,28 +71,28 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing search engine...")
     engine = HybridSearchEngine(model_name='all-MiniLM-L6-v2')
     
-    # Load listings from JSON file
-    data_path = Path("data/listings.json")
+    # Load all data sources and tag with post_type
+    listings_data = load_json_data("data/listings.json", "listing")
+    blogs_data = load_json_data("data/blogs.json", "blog")
+    pages_data = load_json_data("data/pages.json", "page")
     
-    if not data_path.exists():
-        logger.error(f"Data file not found: {data_path}")
-        listings_data = []
-    else:
-        # Load existing data
-        with open(data_path, encoding='utf-8') as f:
-            listings_data = json.load(f)
+    # Merge all data into a single index
+    all_data = listings_data + blogs_data + pages_data
     
-    logger.info(f"Loaded {len(listings_data)} listings")
+    logger.info(
+        f"Total data: {len(all_data)} items "
+        f"({len(listings_data)} listings, {len(blogs_data)} blogs, {len(pages_data)} pages)"
+    )
     
-    # Index listings
-    if listings_data:
-        engine.index_listings(listings_data)
+    # Index all data
+    if all_data:
+        engine.index_listings(all_data)
     
     # Initialize autocomplete
     logger.info("Building autocomplete index...")
     autocomplete = AutocompleteEngine()
-    if listings_data:
-        autocomplete.build_from_listings(listings_data)
+    if all_data:
+        autocomplete.build_from_listings(all_data)
     
     # Store in app state
     app.state.search_engine = engine
@@ -81,8 +110,8 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Franchise Discovery API",
-    description="Intelligent franchise search engine with hybrid keyword + semantic discovery",
-    version="2.1.0",
+    description="Intelligent franchise search engine with hybrid keyword + semantic discovery across listings, blogs, and pages",
+    version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
@@ -101,6 +130,8 @@ app.add_middleware(
 # Include routers
 app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(listings.router, prefix="/api/v1", tags=["listings"])
+app.include_router(blogs.router, prefix="/api/v1", tags=["blogs"])
+app.include_router(pages.router, prefix="/api/v1", tags=["pages"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 
@@ -109,7 +140,7 @@ async def root():
     """Root endpoint with API information."""
     return {
         "name": "Franchise Discovery API",
-        "version": "2.1.0",
+        "version": "3.0.0",
         "status": "running",
         "endpoints": {
             "search": "/api/v1/search",
@@ -117,6 +148,8 @@ async def root():
             "recommend": "/api/v1/recommend/{franchise_id}",
             "autocomplete": "/api/v1/autocomplete",
             "add_listing": "/api/v1/listings",
+            "add_blog": "/api/v1/blogs",
+            "add_page": "/api/v1/pages",
             "retrain": "/api/v1/admin/retrain",
             "health": "/health",
             "docs": "/docs"

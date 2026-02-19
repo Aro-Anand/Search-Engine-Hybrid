@@ -4,7 +4,7 @@ Pydantic schemas for request/response validation.
 This module defines all data models used in the API endpoints.
 """
 
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, Literal
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -29,19 +29,69 @@ class ListingCreate(BaseModel):
                 "sector": "Food & Beverage",
                 "location": "Pan India",
                 "investment_range": "₹50L-₹1Cr",
-                "tags": ["pizza", "food", "restaurant"]
+                "tags": ["pizza", "food", "restaurant"],
+                "slug": "pizza-hut-franchise"
+            }
+        }
+    )
+
+
+class BlogCreate(BaseModel):
+    """Schema for creating a new blog entry."""
+    
+    id: Union[str, int] = Field(..., description="Unique blog identifier")
+    title: str = Field(..., min_length=1, max_length=200, description="Blog title")
+    description: Optional[str] = Field(None, description="Blog content/summary")
+    sector: Optional[str] = Field("Blog", description="Sector category")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Tags for categorization")
+    slug: str = Field(..., description="URL-friendly slug provided by UI")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": 1001,
+                "title": "Best Franchise Opportunities in 2026",
+                "description": "A comprehensive guide to franchise opportunities...",
+                "sector": "Blog",
+                "tags": ["franchise", "business", "opportunity"],
+                "slug": "best-franchise-opportunities-in-2026"
+            }
+        }
+    )
+
+
+class PageCreate(BaseModel):
+    """Schema for creating a new page entry."""
+    
+    id: Union[str, int] = Field(..., description="Unique page identifier")
+    title: str = Field(..., min_length=1, max_length=200, description="Page title")
+    description: Optional[str] = Field(None, description="Page content/summary")
+    sector: Optional[str] = Field("Page", description="Sector category")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Tags for categorization")
+    slug: str = Field(..., description="URL-friendly slug provided by UI")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": 200,
+                "title": "About Us",
+                "description": "Learn about FranTiger...",
+                "sector": "Page",
+                "tags": ["about", "franchise"],
+                "slug": "about-us"
             }
         }
     )
 
 
 class ListingResponse(BaseModel):
-    """Schema for franchise listing response."""
+    """Schema for search result response (listing, blog, or page)."""
     
     id: Union[str, int]  # Accept both string and integer IDs
     title: str
     description: Optional[str] = None
     sector: Optional[str] = None
+    post_type: Optional[str] = Field(None, description="Content type: listing, blog, or page")
     location: Optional[str] = None
     investment_range: Optional[str] = None
     tags: Optional[List[str]] = None

@@ -28,18 +28,20 @@ async def search(
     q: str = Query(..., min_length=1, max_length=200, description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Max results"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
+    post_type: str = Query(None, description="Filter by content type: 'listing', 'blog', or 'page'"),
     sector: str = Query(None, description="Filter by sector (e.g., 'Food & Beverage')"),
     location: str = Query(None, description="Filter by location"),
     min_investment: int = Query(None, description="Minimum investment in lakhs"),
     max_investment: int = Query(None, description="Maximum investment in lakhs")
 ):
     """
-    Search franchise listings with hybrid keyword + semantic matching.
+    Search across listings, blogs, and pages with hybrid keyword + semantic matching.
     
     **Parameters:**
     - **q**: Search query string (required)
     - **limit**: Maximum results to return (1-100, default: 10)
     - **offset**: Pagination offset (default: 0)
+    - **post_type**: Filter by content type: 'listing', 'blog', or 'page' (optional)
     - **sector**: Filter by business sector (optional)
     - **location**: Filter by location (optional)
     - **min_investment**: Minimum investment in lakhs (optional)
@@ -48,7 +50,7 @@ async def search(
     **Returns:**
     - **query**: The search query
     - **total_results**: Total matching results
-    - **results**: List of matching franchise listings with scores
+    - **results**: List of matching results with scores and post_type
     - **processing_time_ms**: Search latency in milliseconds
     """
     start_time = time.time()
@@ -58,6 +60,10 @@ async def search(
         results = request.app.state.search_engine.search(q, top_k=limit + offset + 100)
         
         # Apply filters
+        # Filter by content type (listing, blog, page)
+        if post_type:
+            results = [r for r in results if r.get('post_type', '').lower() == post_type.lower()]
+        
         if sector:
             results = [r for r in results if r.get('sector', '').lower() == sector.lower()]
         
@@ -93,7 +99,7 @@ async def search(
         processing_time = (time.time() - start_time) * 1000
         
         logger.info(
-            f"Search: query='{q}', filters=(sector={sector}, location={location}), "
+            f"Search: query='{q}', filters=(post_type={post_type}, sector={sector}, location={location}), "
             f"results={len(paginated_results)}, time={processing_time:.2f}ms"
         )
         
@@ -203,81 +209,68 @@ async def get_recommendations(
     same_sector: bool = Query(True, description="Only recommend from same sector")
 ):
     """
-    Get franchise recommendations based on similarity.
+    Get franchise recommendations based on AI similarity.
     
     **Parameters:**
-    - **franchise_id**: ID of the franchise to get recommendations for
-    - **limit**: Maximum recommendations (1-20, default: 5)
-    - **same_sector**: Only recommend franchises from the same sector (default: true)
-    
-    **Returns:**
-    - **franchise_id**: ID of the source franchise
-    - **franchise_title**: Title of the source franchise
-    - **recommendations**: List of similar franchises
+    - **franchise_id**: ID or Slug of the source item
+    - **limit**: Maximum recommendations (default: 5)
+    - **same_sector**: Only recommend items from the same sector (default: true)
     """
     try:
         listings = request.app.state.search_engine.listings
         embeddings = request.app.state.search_engine.embeddings
         
-        # Find the source franchise
-        source_franchise = None
-        source_index = None
+        # Find the source item
+        source_item = None
+        source_idx = None
         
-        for idx, listing in enumerate(listings):
-            if str(listing.get('id')) == str(franchise_id) or listing.get('slug') == franchise_id:
-                source_franchise = listing
-                source_index = idx
+        for idx, item in enumerate(listings):
+            if str(item.get('id')) == str(franchise_id) or item.get('slug') == franchise_id:
+                source_item = item
+                source_idx = idx
                 break
         
-        if not source_franchise:
-            raise HTTPException(status_code=404, detail=f"Franchise {franchise_id} not found")
-        
-        # Get embedding for source franchise
+        if not source_item:
+            raise HTTPException(status_code=404, detail="Item not found")
+            
+        # AI similarity math
         from sklearn.metrics.pairwise import cosine_similarity
         import numpy as np
         
-        source_embedding = embeddings[source_index].reshape(1, -1)
+        source_emb = embeddings[source_idx].reshape(1, -1)
+        sims = cosine_similarity(source_emb, embeddings)[0]
         
-        # Calculate similarities with all other franchises
-        similarities = cosine_similarity(source_embedding, embeddings)[0]
-        
-        # Create list of (index, similarity) tuples, excluding the source
-        candidates = [
-            (idx, sim) 
-            for idx, sim in enumerate(similarities) 
-            if idx != source_index
-        ]
-        
-        # Filter by sector if requested
-        if same_sector and source_franchise.get('sector'):
-            source_sector = source_franchise.get('sector', '').lower()
-            candidates = [
-                (idx, sim) 
-                for idx, sim in candidates 
-                if listings[idx].get('sector', '').lower() == source_sector
-            ]
-        
-        # Sort by similarity (descending)
+        # Get candidates
+        candidates = []
+        for i, score in enumerate(sims):
+            if i == source_idx: continue
+            
+            # Sector filter
+            if same_sector:
+                if listings[i].get('sector') != source_item.get('sector'):
+                    continue
+                    
+            candidates.append((i, score))
+            
+        # Sort and limit
         candidates.sort(key=lambda x: x[1], reverse=True)
+        top = candidates[:limit]
         
-        # Get top recommendations
-        recommendations = []
-        for idx, sim in candidates[:limit]:
-            rec = listings[idx].copy()
-            rec['score'] = float(sim)
-            rec['semantic_score'] = float(sim)
-            rec['match_type'] = 'semantic'
-            recommendations.append(rec)
-        
+        formatted = []
+        for idx, score in top:
+            res = listings[idx].copy()
+            res['score'] = float(score)
+            res['semantic_score'] = float(score)
+            res['match_type'] = "semantic"
+            formatted.append(res)
+            
         return RecommendationResponse(
-            franchise_id=franchise_id,
-            franchise_title=source_franchise.get('title', ''),
-            recommendations=recommendations
+            franchise_id=str(source_item.get('id')),
+            franchise_title=source_item.get('title', ''),
+            recommendations=formatted
         )
         
-    except HTTPException:
-        raise
+    except HTTPException: raise
     except Exception as e:
-        logger.error(f"Recommendations error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get recommendations")
-
+        logger.error(f"Recommendation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate recommendations")

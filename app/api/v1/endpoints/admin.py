@@ -5,7 +5,9 @@ This module contains administrative endpoints for system management.
 """
 
 import logging
+import json
 from pathlib import Path
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 
@@ -16,49 +18,71 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _load_and_tag(file_path: str, post_type: str) -> List[Dict[str, Any]]:
+    """Load a JSON data file and tag each record with post_type."""
+    path = Path(file_path)
+    if not path.exists():
+        logger.warning(f"Data file not found: {file_path}")
+        return []
+    
+    with open(path, encoding='utf-8') as f:
+        data = json.load(f)
+    
+    for record in data:
+        record['post_type'] = post_type
+    
+    return data
+
+
 @router.post("/retrain", response_model=RetrainResponse)
 async def retrain_search_engine(request: Request):
     """
-    Force a complete reload of data and re-indexing of the search engine.
+    Force a complete reload of all data and re-indexing of the search engine.
     
     This endpoint:
-    1. Reloads all listings from the JSON file
-    2. Re-generates all embeddings
-    3. Rebuilds the autocomplete index
+    1. Reloads all data from listings.json, blogs.json, and pages.json
+    2. Tags each record with its post_type
+    3. Re-generates all embeddings
+    4. Rebuilds the autocomplete index
     
     **Returns:**
-    - Status and count of reloaded listings
+    - Status and count of reloaded items
     """
     try:
-        data_path = Path("data/listings.json")
+        # Reload all data sources
+        listings_data = _load_and_tag("data/listings.json", "listing")
+        blogs_data = _load_and_tag("data/blogs.json", "blog")
+        pages_data = _load_and_tag("data/pages.json", "page")
         
-        if not data_path.exists():
+        all_data = listings_data + blogs_data + pages_data
+        
+        if not all_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Data file not found: {data_path}"
+                detail="No data files found or all files are empty"
             )
         
-        logger.info("Starting search engine retrain...")
+        logger.info(
+            f"Retraining with {len(all_data)} items "
+            f"({len(listings_data)} listings, {len(blogs_data)} blogs, {len(pages_data)} pages)"
+        )
         
-        # Reload search engine from file
-        count = request.app.state.search_engine.reload_from_file(str(data_path))
+        # Re-index all data
+        request.app.state.search_engine.index_listings(all_data)
         
-        # Rebuild autocomplete from the reloaded listings
-        listings = request.app.state.search_engine.listings
-        request.app.state.autocomplete.build_from_listings(listings)
+        # Rebuild autocomplete
+        request.app.state.autocomplete.build_from_listings(all_data)
         
-        logger.info(f"Retrain complete. Indexed {count} listings")
+        logger.info(f"Retrain complete. Indexed {len(all_data)} items")
         
         return RetrainResponse(
             status="success",
-            message=f"Search engine retrained successfully",
-            listings_count=count
+            message=f"Search engine retrained with {len(listings_data)} listings, {len(blogs_data)} blogs, {len(pages_data)} pages",
+            listings_count=len(all_data)
         )
         
     except HTTPException:
         raise
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Retrain error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Retrain failed")

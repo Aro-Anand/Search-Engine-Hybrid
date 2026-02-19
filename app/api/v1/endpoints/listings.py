@@ -36,6 +36,9 @@ async def add_listing(
         # Convert Pydantic model to dict
         listing_dict = listing.model_dump()
         
+        # Tag as listing type
+        listing_dict['post_type'] = 'listing'
+        
         # Validate slug exists since UI will send it
         if not listing_dict.get('slug'):
             raise HTTPException(
