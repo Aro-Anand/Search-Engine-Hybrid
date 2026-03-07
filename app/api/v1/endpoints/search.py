@@ -59,6 +59,36 @@ async def search(
         # Execute search
         results = request.app.state.search_engine.search(q, top_k=limit + offset + 100)
         
+        # --- INTENT-BASED DYNAMIC BOOSTING ---
+        q_lower = q.lower()
+        
+        # Define keywords that strongly suggest the user wants to see franchise listings
+        listing_keywords = [
+            "franchise", "company", "buy", "cost", "price", "investment", 
+            "affordable", "cheap", "business", "start", "own", "open"
+        ]
+        
+        # Define keywords that strongly suggest informational intent (blogs/pages)
+        info_keywords = [
+            "what is", "how to", "guide", "tips", "learn", "meaning", "explain"
+        ]
+        
+        is_listing_intent = any(kw in q_lower for kw in listing_keywords)
+        is_info_intent = any(kw in q_lower for kw in info_keywords)
+        
+        if is_listing_intent and not is_info_intent:
+            for r in results:
+                if r.get('post_type') == 'listing':
+                    r['score'] = r.get('score', 0) * 1.50 # Significant boost
+        elif is_info_intent and not is_listing_intent:
+            for r in results:
+                if r.get('post_type') in ['blog', 'page']:
+                    r['score'] = r.get('score', 0) * 1.50 # Significant boost
+                    
+        # Re-sort results based on potentially new boosted scores
+        results.sort(key=lambda x: x.get('score', 0), reverse=True)
+        # -------------------------------------
+        
         # Apply filters
         # Filter by content type (listing, blog, page)
         if post_type:
