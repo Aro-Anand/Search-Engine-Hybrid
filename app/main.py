@@ -147,9 +147,15 @@ async def root():
             "filters": "/api/v1/filters",
             "recommend": "/api/v1/recommend/{franchise_id}",
             "autocomplete": "/api/v1/autocomplete",
-            "add_listing": "/api/v1/listings",
-            "add_blog": "/api/v1/blogs",
-            "add_page": "/api/v1/pages",
+            "add_listing": "POST /api/v1/listings",
+            "update_listing": "PUT /api/v1/listings/{listing_id}",
+            "delete_listing": "DELETE /api/v1/listings/{listing_id}",
+            "add_blog": "POST /api/v1/blogs",
+            "update_blog": "PUT /api/v1/blogs/{blog_id}",
+            "delete_blog": "DELETE /api/v1/blogs/{blog_id}",
+            "add_page": "POST /api/v1/pages",
+            "update_page": "PUT /api/v1/pages/{page_id}",
+            "delete_page": "DELETE /api/v1/pages/{page_id}",
             "retrain": "/api/v1/admin/retrain",
             "health": "/health",
             "docs": "/docs"
@@ -173,7 +179,7 @@ async def health_check():
         "indexed_listings": stats['indexed_listings'],
         "total_searches": stats['total_searches'],
         "model_loaded": True,
-        "version": "2.1.0"
+        "version": "3.0.0"
     }
 
 

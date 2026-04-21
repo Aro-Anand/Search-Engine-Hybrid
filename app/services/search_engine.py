@@ -309,7 +309,7 @@ class HybridSearchEngine:
                        for term in query_terms):
                     keyword_score *= 3.0  # Increased boost from 1.2 to 3.0
                 
-                # Cap at 1.0
+                # Cap at 3.0 (allows title-boost scores above 1.0)
                 keyword_score = min(keyword_score, 3.0)
                 
                 # Add result
@@ -421,3 +421,99 @@ class HybridSearchEngine:
             'total_searches': self.stats['total_searches'],
             'model_name': self.model.__class__.__name__
         }
+    
+    def update_listing(self, listing_id, updated_listing: Dict[str, Any]) -> bool:
+        """
+        Update an existing listing in the index.
+        
+        Finds the listing by ID, replaces its data, and regenerates its embedding.
+        
+        Args:
+            listing_id: The ID of the listing to update (str or int)
+            updated_listing: New listing data with at least 'id' and 'title'
+        
+        Returns:
+            True if listing was found and updated, False if not found
+        
+        Raises:
+            ValueError: If updated_listing is missing required fields
+        """
+        # Validate required fields
+        required_fields = {'id', 'title'}
+        missing = required_fields - set(updated_listing.keys())
+        if missing:
+            raise ValueError(f"Listing missing required fields: {missing}")
+        
+        # Find the listing index
+        target_idx = None
+        for idx, listing in enumerate(self.listings):
+            if str(listing.get('id')) == str(listing_id):
+                target_idx = idx
+                break
+        
+        if target_idx is None:
+            logger.warning(f"Listing not found for update: {listing_id}")
+            return False
+        
+        logger.info(f"Updating listing: {listing_id}")
+        
+        # Replace listing data
+        self.listings[target_idx] = updated_listing
+        
+        # Regenerate embedding for updated listing
+        searchable_text = " ".join([
+            updated_listing.get('title', ''),
+            updated_listing.get('description', ''),
+            updated_listing.get('sector', ''),
+            updated_listing.get('location', ''),
+            updated_listing.get('investment_range', ''),
+            " ".join(updated_listing.get('tags', []))
+        ]).strip()
+        
+        new_embedding = self.model.encode(
+            [searchable_text],
+            show_progress_bar=False,
+            normalize_embeddings=True
+        )
+        
+        # Replace the embedding at the same index
+        if self.embeddings is not None:
+            self.embeddings[target_idx] = new_embedding[0]
+        
+        logger.info(f"Listing updated: {listing_id}")
+        return True
+    
+    def delete_listing(self, listing_id) -> bool:
+        """
+        Delete a listing from the index.
+        
+        Removes the listing and its embedding from the index.
+        
+        Args:
+            listing_id: The ID of the listing to delete (str or int)
+        
+        Returns:
+            True if listing was found and deleted, False if not found
+        """
+        # Find the listing index
+        target_idx = None
+        for idx, listing in enumerate(self.listings):
+            if str(listing.get('id')) == str(listing_id):
+                target_idx = idx
+                break
+        
+        if target_idx is None:
+            logger.warning(f"Listing not found for deletion: {listing_id}")
+            return False
+        
+        logger.info(f"Deleting listing: {listing_id}")
+        
+        # Remove from listings
+        self.listings.pop(target_idx)
+        
+        # Remove from embeddings
+        if self.embeddings is not None and len(self.embeddings) > 0:
+            self.embeddings = np.delete(self.embeddings, target_idx, axis=0)
+        
+        logger.info(f"Listing deleted. Total listings: {len(self.listings)}")
+        return True

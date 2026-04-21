@@ -5,6 +5,7 @@ This module contains endpoints for search and autocomplete functionality.
 """
 
 import logging
+import re
 import time
 from typing import List
 
@@ -107,7 +108,6 @@ async def search(
                 inv_range = r.get('investment_range', '')
                 if inv_range:
                     # Extract numbers from investment_range (e.g., "₹10L-₹20L")
-                    import re
                     numbers = re.findall(r'(\d+)L', inv_range)
                     if numbers:
                         min_val = int(numbers[0])

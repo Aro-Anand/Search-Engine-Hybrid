@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  search-engine:
+    build: .
+    container_name: search-engine
+    ports:
+      - "9999:9999"
+    volumes:
+      # Mount data directory so JSON changes persist across container restarts
+      - ./data:/app/data
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9999/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
