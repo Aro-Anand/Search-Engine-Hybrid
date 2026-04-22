@@ -150,8 +150,9 @@ async def search(
 @router.get("/autocomplete", response_model=AutocompleteResponse)
 async def autocomplete(
     request: Request,
-    q: str = Query(..., min_length=1, max_length=50, description="Partial query"),
-    limit: int = Query(5, ge=1, le=10, description="Max suggestions")
+    q: str = Query(..., min_length=1, max_length=200, description="Partial query"),
+    limit: int = Query(5, ge=1, le=10, description="Max suggestions"),
+    max: int = Query(None, ge=1, le=20, description="Alias for limit (backward compat)")
 ):
     """
     Get smart autocomplete suggestions (titles only) using background search.
@@ -160,12 +161,15 @@ async def autocomplete(
     the most relevant franchise titles based on the users partial input.
     """
     try:
+        # Support 'max' as an alias for 'limit' (some frontend widgets send max=N)
+        effective_limit = min(max, 10) if max is not None else limit
+        
         # Use the dedicated autocomplete engine for prefix matching
-        suggestions = request.app.state.autocomplete.suggest(q, limit=limit)
+        suggestions = request.app.state.autocomplete.suggest(q, limit=effective_limit)
         
         # If Trie returns nothing, fallback to search engine for semantic suggestions
         if not suggestions:
-            results = request.app.state.search_engine.search(q, top_k=limit)
+            results = request.app.state.search_engine.search(q, top_k=effective_limit)
             suggestions = []
             seen = set()
             for r in results:
@@ -173,7 +177,7 @@ async def autocomplete(
                 if title and title not in seen:
                     suggestions.append(title)
                     seen.add(title)
-                if len(suggestions) >= limit:
+                if len(suggestions) >= effective_limit:
                     break
         
         return AutocompleteResponse(
