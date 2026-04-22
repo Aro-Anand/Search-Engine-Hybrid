@@ -12,6 +12,8 @@ services:
     environment:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9999/health')"]
